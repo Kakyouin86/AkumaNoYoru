@@ -6,7 +6,7 @@ AnimationClip:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Heroine - Crouch Attack
+  m_Name: Heroine - Slide Start
   serializedVersion: 7
   m_Legacy: 0
   m_Compressed: 0
@@ -21,19 +21,13 @@ AnimationClip:
   - serializedVersion: 2
     curve:
     - time: 0
-      value: {fileID: -1263401329512269962, guid: 7672dd5cab20d2f4faad378c3487600b, type: 3}
-    - time: 0.05
-      value: {fileID: 7600655904052803129, guid: 7672dd5cab20d2f4faad378c3487600b, type: 3}
-    - time: 0.1
-      value: {fileID: 129880498882430182, guid: 7672dd5cab20d2f4faad378c3487600b, type: 3}
-    - time: 0.15
-      value: {fileID: 3396220439578710527, guid: 7672dd5cab20d2f4faad378c3487600b, type: 3}
+      value: {fileID: -6783183566526504594, guid: 662a48d3ed82d2f4d8b6021ab0973821, type: 3}
     attribute: m_Sprite
     path: 
     classID: 212
     script: {fileID: 0}
     flags: 2
-  m_SampleRate: 20
+  m_SampleRate: 12
   m_WrapMode: 0
   m_Bounds:
     m_Center: {x: 0, y: 0, z: 0}
@@ -50,16 +44,13 @@ AnimationClip:
       isIntCurve: 0
       isSerializeReferenceCurve: 0
     pptrCurveMapping:
-    - {fileID: -1263401329512269962, guid: 7672dd5cab20d2f4faad378c3487600b, type: 3}
-    - {fileID: 7600655904052803129, guid: 7672dd5cab20d2f4faad378c3487600b, type: 3}
-    - {fileID: 129880498882430182, guid: 7672dd5cab20d2f4faad378c3487600b, type: 3}
-    - {fileID: 3396220439578710527, guid: 7672dd5cab20d2f4faad378c3487600b, type: 3}
+    - {fileID: -6783183566526504594, guid: 662a48d3ed82d2f4d8b6021ab0973821, type: 3}
   m_AnimationClipSettings:
     serializedVersion: 2
     m_AdditiveReferencePoseClip: {fileID: 0}
     m_AdditiveReferencePoseTime: 0
     m_StartTime: 0
-    m_StopTime: 0.2
+    m_StopTime: 0.083333336
     m_OrientationOffsetY: 0
     m_Level: 0
     m_CycleOffset: 0
@@ -78,11 +69,4 @@ AnimationClip:
   m_EulerEditorCurves: []
   m_HasGenericRootTransform: 0
   m_HasMotionFloatCurves: 0
-  m_Events:
-  - time: 0.15
-    functionName: FinishAllIdleAttacks
-    data: 
-    objectReferenceParameter: {fileID: 0}
-    floatParameter: 0
-    intParameter: 0
-    messageOptions: 0
+  m_Events: []

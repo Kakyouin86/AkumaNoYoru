@@ -16,9 +16,9 @@ public class PlayerController : MonoBehaviour
     public Collider2D crawlCollider;
 
     [Header("Ground Check Settings")]
-    public float groundCheckRadius = 2f;
+    public float groundCheckRadius = 1f;
     public Vector2 bottomOffset;
-    public float groundCheckWidth = 0.0f;
+    public float groundCheckWidth = 3.0f;
     public LayerMask groundLayer;
     [ReadOnly] public bool isGrounded;
 
@@ -38,10 +38,10 @@ public class PlayerController : MonoBehaviour
 
     [Header("Jump Settings")]
     public bool canJump = true;
+    [ReadOnly] public bool isJumping;
     public float jumpForce = 200f;
     public int totalJumps = 2;
     [ReadOnly] public int availableJumps;
-    [ReadOnly] public bool isJumping;
 
     [Header("Jump Feel")]
     public float fallMultiplier = 25f;
@@ -56,19 +56,21 @@ public class PlayerController : MonoBehaviour
     public bool canAttackCrouch = true;
     public bool canAttackJump = true;
     public bool canAttackJumpDown = true;
-    public float jumpDownSpeed = -300f;
+    public bool canAttackUp = true;
 
     [ReadOnly] public bool isAttackingIdle;
     [ReadOnly] public bool isAttackingCrouch;
     [ReadOnly] public bool isAttackingJump;
     [ReadOnly] public bool isAttackingJumpDown;
+    [ReadOnly] public bool isAttackingUp; 
 
+    public float jumpDownSpeed = -300f;
     public string attackIdleAnimation = "Heroine - Attack";
     public string attackCrouchAnimation = "Heroine - Crouch Attack";
     public string attackJumpAnimation = "Heroine - Jump Attack";
     //public string attackJumpDownAnimation = "Heroine - Jump Down Attack";
-
-    // -------------------- ENUMS --------------------
+    public string attackUpAnimation = "Heroine - Attack Up";
+    
     public enum JumpAttackDirection { Up, Down, Both }
     public enum JumpDownAttackDirection { Up, Down, Both }
     public enum AirAttackMovement { Freeze, Free }
@@ -80,6 +82,13 @@ public class PlayerController : MonoBehaviour
     [Header("Jump Down Attack Settings")]
     public JumpDownAttackDirection jumpDownAttackDirection = JumpDownAttackDirection.Both;
     public AirAttackMovement jumpDownAttackMovement = AirAttackMovement.Free;
+
+    [Header("Slide Settings")]
+    public bool canSlide = true;
+    [ReadOnly] public bool isSliding;
+    public float slideForce = 200f;
+    public float slideDuration = 0.35f;
+    public float slideTimer;
 
     private Player player;
 
@@ -101,6 +110,7 @@ public class PlayerController : MonoBehaviour
         if (!canMove) return;
 
         GroundCheck();
+        HandleSlide();
         Jump();
         Walk();
         Crouch();
@@ -114,11 +124,13 @@ public class PlayerController : MonoBehaviour
     // -------------------- MOVEMENT --------------------
     public void Walk()
     {
+        if (isSliding) return;
+
         float moveInput = player.GetAxis("Move Horizontal");
 
-        if ((isAttackingIdle || isAttackingCrouch) ||
-            (isAttackingJump && jumpAttackMovement == AirAttackMovement.Freeze) ||
-            (isAttackingJumpDown && jumpDownAttackMovement == AirAttackMovement.Freeze))
+        if ((isAttackingIdle || isAttackingCrouch || isAttackingUp) ||
+          (isAttackingJump && jumpAttackMovement == AirAttackMovement.Freeze) ||
+          (isAttackingJumpDown && jumpDownAttackMovement == AirAttackMovement.Freeze))
         {
             moveInput = 0f;
         }
@@ -132,6 +144,12 @@ public class PlayerController : MonoBehaviour
 
     public void Jump()
     {
+        if (isSliding) return;
+        if (!canJump || isAttackingJumpDown) return;
+        if (isSliding) return;
+        if (isGrounded && player.GetButton("Crouch") && player.GetButtonDown("Jump") && canSlide)
+            return;
+
         if (!canJump || isAttackingJumpDown) return;
 
         if (player.GetButtonDown("Jump"))
@@ -144,6 +162,7 @@ public class PlayerController : MonoBehaviour
 
                 if (isAttackingIdle) FinishAttackIdle();
                 if (isAttackingCrouch) FinishAttackCrouch();
+                if (isAttackingUp) FinishAttackUp();
             }
             else if (availableJumps > 0)
             {
@@ -163,7 +182,12 @@ public class PlayerController : MonoBehaviour
 
     public void Crouch()
     {
-        if (!canCrouch) return;
+        if (!canCrouch || isSliding)
+        {
+            isCrouching = false;
+            isCrawling = false;
+            return;
+        }
 
         bool downPressed = player.GetButton("Crouch");
         float horizontalInput = player.GetAxis("Move Horizontal");
@@ -183,6 +207,7 @@ public class PlayerController : MonoBehaviour
     // -------------------- ATTACK --------------------
     public void HandleAttack()
     {
+        if (isSliding) return;
         if (player.GetButtonDown("Jump"))
             return;
 
@@ -233,6 +258,13 @@ public class PlayerController : MonoBehaviour
             return;
         }
 
+        // Ataque Up
+        if (canAttackUp && !isAttackingUp && isGrounded && player.GetButtonDown("Attack") && player.GetAxis("Move Vertical") > 0.5f)
+        {
+            StartAttackUp();
+            return;
+        }
+
         // Ataque Idle
         if (canAttackIdle && !isAttackingIdle && !isCrouching && isGrounded && player.GetButtonDown("Attack"))
         {
@@ -245,6 +277,7 @@ public class PlayerController : MonoBehaviour
         if (isAttackingCrouch) CheckAttackEnd(attackCrouchAnimation, FinishAttackCrouch);
         if (isAttackingJump) CheckAttackEnd(attackJumpAnimation, FinishAttackJump);
         //if (isAttackingJumpDown) CheckAttackEnd(attackJumpDownAnimation, FinishAttackJumpDown);
+        if (isAttackingUp) CheckAttackEnd(attackUpAnimation, FinishAttackUp);
     }
 
     public void CheckAttackEnd(string animName, System.Action finishMethod)
@@ -309,6 +342,20 @@ public class PlayerController : MonoBehaviour
         theAnim.SetBool("IsAttackingJumpDown", false);
     }
 
+    public void StartAttackUp()
+    {
+        isAttackingUp = true;
+        theAnim.SetBool("IsAttackingUp", true);
+        theRB.linearVelocity = new Vector2(0f, theRB.linearVelocity.y); // detiene movimiento horizontal
+    }
+
+    public void FinishAttackUp()
+    {
+        isAttackingUp = false;
+        theAnim.SetBool("IsAttackingUp", false);
+    }
+
+
     // -------------------- GROUND CHECK --------------------
     public void GroundCheck()
     {
@@ -354,6 +401,54 @@ public class PlayerController : MonoBehaviour
             theSR.flipX = !facingRight;
     }
 
+    public void HandleSlide()
+    {
+        if (!canSlide) return;
+        if (isAttackingIdle || isAttackingCrouch || isAttackingJump || isAttackingJumpDown || isAttackingUp) return;
+
+        if (isSliding && !isGrounded)
+        {
+            FinishSlide();
+            return;
+        }
+
+        if (!isSliding && isGrounded && player.GetButton("Crouch") && player.GetButtonDown("Jump"))
+        {
+            StartSlide();
+        }
+
+        if (isSliding)
+        {
+            slideTimer -= Time.deltaTime;
+
+            float direction = facingRight ? 1f : -1f;
+            theRB.linearVelocity = new Vector2(direction * slideForce, theRB.linearVelocity.y);
+
+            if (slideTimer <= 0f)
+            {
+                FinishSlide();
+            }
+        }
+    }
+
+    public void StartSlide()
+    {
+        isSliding = true;
+        slideTimer = slideDuration;
+
+        theAnim.SetBool("IsSliding", true);
+
+        float direction = facingRight ? 1f : -1f;
+        theRB.linearVelocity = new Vector2(direction * slideForce, theRB.linearVelocity.y);
+    }
+
+    public void FinishSlide()
+    {
+        isSliding = false;
+        theAnim.SetBool("IsSliding", false);
+        theRB.linearVelocity = new Vector2(0f, theRB.linearVelocity.y);
+    }
+
     // -------------------- ANIMATOR --------------------
     public void UpdateAnimator()
     {
@@ -368,6 +463,8 @@ public class PlayerController : MonoBehaviour
         theAnim.SetBool("IsAttackingCrouch", isAttackingCrouch);
         theAnim.SetBool("IsAttackingJump", isAttackingJump);
         theAnim.SetBool("IsAttackingJumpDown", isAttackingJumpDown);
+        theAnim.SetBool("IsAttackingUp", isAttackingUp);
+        theAnim.SetBool("IsSliding", isSliding);
     }
 
     public void UpdateDebugVars()
@@ -388,6 +485,15 @@ public class PlayerController : MonoBehaviour
             crawlCollider.enabled = false;
             return;
         }
+
+        if (isAttackingUp)
+        {
+            standCollider.enabled = true;
+            crouchCollider.enabled = false;
+            crawlCollider.enabled = false;
+            return;
+        }
+
         if (isAttackingCrouch)
         {
             standCollider.enabled = false;
