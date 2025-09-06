@@ -32,7 +32,7 @@ public class PlayerController : MonoBehaviour
 
     [Header("Crouch & Crawl Settings")]
     public bool canCrouch = true;
-    public bool canCrawl = false;
+    public bool canCrawl = true;
     [ReadOnly] public bool isCrouching;
     [ReadOnly] public bool isCrawling;
 
@@ -44,7 +44,7 @@ public class PlayerController : MonoBehaviour
     [ReadOnly] public bool isJumping;
 
     [Header("Jump Feel")]
-    public float fallMultiplier = 25;
+    public float fallMultiplier = 25f;
     public float lowJumpMultiplier = 2f;
 
     [Header("Coyote Settings")]
@@ -54,9 +54,32 @@ public class PlayerController : MonoBehaviour
     [Header("Attack Settings")]
     public bool canAttackIdle = true;
     public bool canAttackCrouch = true;
-    [ReadOnly] public bool isAttacking;
+    public bool canAttackJump = true;
+    public bool canAttackJumpDown = true;
+    public float jumpDownSpeed = -300f;
+
+    [ReadOnly] public bool isAttackingIdle;
+    [ReadOnly] public bool isAttackingCrouch;
+    [ReadOnly] public bool isAttackingJump;
+    [ReadOnly] public bool isAttackingJumpDown;
+
     public string attackIdleAnimation = "Heroine - Attack";
     public string attackCrouchAnimation = "Heroine - Crouch Attack";
+    public string attackJumpAnimation = "Heroine - Jump Attack";
+    //public string attackJumpDownAnimation = "Heroine - Jump Down Attack";
+
+    // -------------------- ENUMS --------------------
+    public enum JumpAttackDirection { Up, Down, Both }
+    public enum JumpDownAttackDirection { Up, Down, Both }
+    public enum AirAttackMovement { Freeze, Free }
+
+    [Header("Jump Attack Settings")]
+    public JumpAttackDirection jumpAttackDirection = JumpAttackDirection.Both;
+    public AirAttackMovement jumpAttackMovement = AirAttackMovement.Freeze;
+
+    [Header("Jump Down Attack Settings")]
+    public JumpDownAttackDirection jumpDownAttackDirection = JumpDownAttackDirection.Both;
+    public AirAttackMovement jumpDownAttackMovement = AirAttackMovement.Free;
 
     private Player player;
 
@@ -78,8 +101,8 @@ public class PlayerController : MonoBehaviour
         if (!canMove) return;
 
         GroundCheck();
-        Walk();
         Jump();
+        Walk();
         Crouch();
         HandleAttack();
         UpdateFacing();
@@ -89,13 +112,16 @@ public class PlayerController : MonoBehaviour
     }
 
     // -------------------- MOVEMENT --------------------
-    void Walk()
+    public void Walk()
     {
         float moveInput = player.GetAxis("Move Horizontal");
 
-        // Bloquear movimiento si está atacando
-        if (isAttacking || (isCrouching && !canCrawl))
+        if ((isAttackingIdle || isAttackingCrouch) ||
+            (isAttackingJump && jumpAttackMovement == AirAttackMovement.Freeze) ||
+            (isAttackingJumpDown && jumpDownAttackMovement == AirAttackMovement.Freeze))
+        {
             moveInput = 0f;
+        }
 
         float speed = moveSpeed;
         if (isCrouching && canCrawl)
@@ -104,13 +130,9 @@ public class PlayerController : MonoBehaviour
         theRB.linearVelocity = new Vector2(moveInput * speed, theRB.linearVelocity.y);
     }
 
-    void Jump()
+    public void Jump()
     {
-        if (!canJump) return;
-
-        // Bloquear salto si está atacando
-        if (isAttacking)
-            return;
+        if (!canJump || isAttackingJumpDown) return;
 
         if (player.GetButtonDown("Jump"))
         {
@@ -119,6 +141,9 @@ public class PlayerController : MonoBehaviour
                 theRB.linearVelocity = new Vector2(theRB.linearVelocity.x, jumpForce);
                 availableJumps = totalJumps - 1;
                 coyoteTimeCounter = 0f;
+
+                if (isAttackingIdle) FinishAttackIdle();
+                if (isAttackingCrouch) FinishAttackCrouch();
             }
             else if (availableJumps > 0)
             {
@@ -136,7 +161,7 @@ public class PlayerController : MonoBehaviour
             theRB.linearVelocity += Vector2.up * Physics2D.gravity.y * (lowJumpMultiplier - 1) * Time.deltaTime;
     }
 
-    void Crouch()
+    public void Crouch()
     {
         if (!canCrouch) return;
 
@@ -156,41 +181,136 @@ public class PlayerController : MonoBehaviour
     }
 
     // -------------------- ATTACK --------------------
-    void HandleAttack()
+    public void HandleAttack()
     {
-        // Ataque Idle
-        if (!isAttacking && !isCrouching && isGrounded && canAttackIdle && player.GetButtonDown("Attack"))
-            StartAttack(attackIdleAnimation, "IsAttackingIdle");
+        if (player.GetButtonDown("Jump"))
+            return;
 
-        // Ataque Crouch
-        if (!isAttacking && isCrouching && isGrounded && canAttackCrouch && player.GetButtonDown("Attack"))
-            StartAttack(attackCrouchAnimation, "IsAttackingCrouch");
-
-        // Revisar si termina la animación
-        if (isAttacking)
+        // -------------------- ATAQUES EN AIRE --------------------
+        // Ataque Jump Down (↓ + Attack) PRIORIDAD ALTA
+        if (canAttackJumpDown && !isAttackingJumpDown && !isGrounded && player.GetButton("Crouch") && player.GetButtonDown("Attack"))
         {
-            AnimatorStateInfo state = theAnim.GetCurrentAnimatorStateInfo(0);
-            if ((state.IsName(attackIdleAnimation) || state.IsName(attackCrouchAnimation)) && state.normalizedTime >= 1f)
-                FinishAttack();
+            bool canPerform = false;
+
+            switch (jumpDownAttackDirection)
+            {
+                case JumpDownAttackDirection.Up: canPerform = theRB.linearVelocity.y > 0f; break;
+                case JumpDownAttackDirection.Down: canPerform = theRB.linearVelocity.y <= 0f; break;
+                case JumpDownAttackDirection.Both: canPerform = true; break;
+            }
+
+            if (canPerform)
+            {
+                StartAttackJumpDown();
+                return; // Prioridad alta, no ejecutar otros ataques
+            }
         }
+
+        // Ataque Jump normal (aire)
+        if (canAttackJump && !isAttackingJump && !isAttackingJumpDown && !isGrounded && player.GetButtonDown("Attack"))
+        {
+            bool canPerform = false;
+
+            switch (jumpAttackDirection)
+            {
+                case JumpAttackDirection.Up: canPerform = theRB.linearVelocity.y > 0f; break;
+                case JumpAttackDirection.Down: canPerform = theRB.linearVelocity.y <= 0f; break;
+                case JumpAttackDirection.Both: canPerform = true; break;
+            }
+
+            if (canPerform)
+            {
+                StartAttackJump();
+                return;
+            }
+        }
+
+        // -------------------- ATAQUES EN SUELO --------------------
+        // Ataque Crouch
+        if (canAttackCrouch && !isAttackingCrouch && isCrouching && isGrounded && player.GetButtonDown("Attack"))
+        {
+            StartAttackCrouch();
+            return;
+        }
+
+        // Ataque Idle
+        if (canAttackIdle && !isAttackingIdle && !isCrouching && isGrounded && player.GetButtonDown("Attack"))
+        {
+            StartAttackIdle();
+            return;
+        }
+
+        // -------------------- REVISAR FIN DE ANIMACIONES --------------------
+        if (isAttackingIdle) CheckAttackEnd(attackIdleAnimation, FinishAttackIdle);
+        if (isAttackingCrouch) CheckAttackEnd(attackCrouchAnimation, FinishAttackCrouch);
+        if (isAttackingJump) CheckAttackEnd(attackJumpAnimation, FinishAttackJump);
+        //if (isAttackingJumpDown) CheckAttackEnd(attackJumpDownAnimation, FinishAttackJumpDown);
     }
 
-    void StartAttack(string animName, string animBool)
+    public void CheckAttackEnd(string animName, System.Action finishMethod)
     {
-        isAttacking = true;
-        theAnim.SetBool(animBool, true);
-        theRB.linearVelocity = new Vector2(0f, theRB.linearVelocity.y); // detener movimiento
+        AnimatorStateInfo state = theAnim.GetCurrentAnimatorStateInfo(0);
+        if (state.IsName(animName) && state.normalizedTime >= 1f)
+            finishMethod.Invoke();
     }
 
-    void FinishAttack()
+    // -------------------- ATTACK METHODS --------------------
+    public void StartAttackIdle()
     {
-        isAttacking = false;
+        isAttackingIdle = true;
+        theAnim.SetBool("IsAttackingIdle", true);
+        theRB.linearVelocity = new Vector2(0f, theRB.linearVelocity.y);
+    }
+
+    public void FinishAttackIdle()
+    {
+        isAttackingIdle = false;
         theAnim.SetBool("IsAttackingIdle", false);
+    }
+
+    public void StartAttackCrouch()
+    {
+        isAttackingCrouch = true;
+        theAnim.SetBool("IsAttackingCrouch", true);
+        theRB.linearVelocity = new Vector2(0f, theRB.linearVelocity.y);
+    }
+
+    public void FinishAttackCrouch()
+    {
+        isAttackingCrouch = false;
         theAnim.SetBool("IsAttackingCrouch", false);
     }
 
+    public void StartAttackJump()
+    {
+        isAttackingJump = true;
+        theAnim.SetBool("IsAttackingJump", true);
+
+        if (jumpAttackMovement == AirAttackMovement.Freeze)
+            theRB.linearVelocity = new Vector2(0f, theRB.linearVelocity.y);
+    }
+
+    public void FinishAttackJump()
+    {
+        isAttackingJump = false;
+        theAnim.SetBool("IsAttackingJump", false);
+    }
+
+    public void StartAttackJumpDown()
+    {
+        isAttackingJumpDown = true;
+        theAnim.SetBool("IsAttackingJumpDown", true);
+        theRB.linearVelocity = new Vector2(0f, jumpDownSpeed);
+    }
+
+    public void FinishAttackJumpDown()
+    {
+        isAttackingJumpDown = false;
+        theAnim.SetBool("IsAttackingJumpDown", false);
+    }
+
     // -------------------- GROUND CHECK --------------------
-    void GroundCheck()
+    public void GroundCheck()
     {
         Vector2 basePos = (Vector2)transform.position + bottomOffset;
         Vector2 left = basePos + Vector2.left * groundCheckWidth;
@@ -206,18 +326,26 @@ public class PlayerController : MonoBehaviour
         {
             ResetJumps();
             coyoteTimeCounter = coyoteTime;
+
+            if (isAttackingJumpDown) FinishAttackJumpDown();
+            if (isAttackingJump) FinishAttackJump();
         }
         else
+        {
             coyoteTimeCounter -= Time.deltaTime;
+
+            if (isAttackingJumpDown)
+                theRB.linearVelocity = new Vector2(0f, jumpDownSpeed);
+        }
     }
 
-    void ResetJumps()
+    public void ResetJumps()
     {
         availableJumps = totalJumps;
     }
 
     // -------------------- FACING --------------------
-    void UpdateFacing()
+    public void UpdateFacing()
     {
         if (theRB.linearVelocity.x > 0) facingRight = true;
         else if (theRB.linearVelocity.x < 0) facingRight = false;
@@ -227,7 +355,7 @@ public class PlayerController : MonoBehaviour
     }
 
     // -------------------- ANIMATOR --------------------
-    void UpdateAnimator()
+    public void UpdateAnimator()
     {
         float horizontalSpeed = Mathf.Abs(theRB.linearVelocity.x);
         theAnim.SetFloat("Speed", horizontalSpeed);
@@ -236,11 +364,13 @@ public class PlayerController : MonoBehaviour
         theAnim.SetBool("IsCrouching", isCrouching);
         theAnim.SetBool("IsCrawling", isCrawling);
         theAnim.SetBool("IsJumping", isJumping);
-        theAnim.SetBool("IsAttackingIdle", theAnim.GetBool("IsAttackingIdle"));
-        theAnim.SetBool("IsAttackingCrouch", theAnim.GetBool("IsAttackingCrouch"));
+        theAnim.SetBool("IsAttackingIdle", isAttackingIdle);
+        theAnim.SetBool("IsAttackingCrouch", isAttackingCrouch);
+        theAnim.SetBool("IsAttackingJump", isAttackingJump);
+        theAnim.SetBool("IsAttackingJumpDown", isAttackingJumpDown);
     }
 
-    void UpdateDebugVars()
+    public void UpdateDebugVars()
     {
         currentSpeed = Mathf.Abs(theRB.linearVelocity.x);
         verticalVelocity = theRB.linearVelocity.y;
@@ -249,24 +379,21 @@ public class PlayerController : MonoBehaviour
     }
 
     // -------------------- COLLIDER MANAGEMENT --------------------
-    void UpdateColliders()
+    public void UpdateColliders()
     {
-        if (isAttacking)
+        if (isAttackingIdle)
         {
-            if (theAnim.GetBool("IsAttackingIdle"))
-            {
-                standCollider.enabled = true;
-                crouchCollider.enabled = false;
-                crawlCollider.enabled = false;
-                return;
-            }
-            if (theAnim.GetBool("IsAttackingCrouch"))
-            {
-                standCollider.enabled = false;
-                crouchCollider.enabled = true;
-                crawlCollider.enabled = false;
-                return;
-            }
+            standCollider.enabled = true;
+            crouchCollider.enabled = false;
+            crawlCollider.enabled = false;
+            return;
+        }
+        if (isAttackingCrouch)
+        {
+            standCollider.enabled = false;
+            crouchCollider.enabled = true;
+            crawlCollider.enabled = false;
+            return;
         }
 
         standCollider.enabled = !isCrouching && !isCrawling;
@@ -275,7 +402,7 @@ public class PlayerController : MonoBehaviour
     }
 
     // -------------------- DEBUG --------------------
-    void OnDrawGizmos()
+    public void OnDrawGizmos()
     {
         Gizmos.color = isGrounded ? Color.green : Color.red;
 

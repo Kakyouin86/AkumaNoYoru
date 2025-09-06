@@ -9775,6 +9775,7 @@ GameObject:
   - component: {fileID: 1387156180}
   - component: {fileID: 1387156179}
   - component: {fileID: 1387156181}
+  - component: {fileID: 1387156182}
   m_Layer: 0
   m_Name: Player SR
   m_TagString: Untagged
@@ -9923,6 +9924,18 @@ Animator:
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
   m_WriteDefaultValuesOnDisable: 0
+--- !u!114 &1387156182
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1387156177}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ba1eea4c6466e444ab138418ba5a6acb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AnimationEventBridge
 --- !u!1 &1479787898
 GameObject:
   m_ObjectHideFlags: 0
@@ -10422,9 +10435,23 @@ MonoBehaviour:
   lowJumpMultiplier: 2
   coyoteTime: 0.1
   coyoteTimeCounter: 0
-  canAttack: 1
-  isAttacking: 0
-  attackAnimation: Heroine - Attack
+  canAttackIdle: 1
+  canAttackCrouch: 1
+  canAttackJump: 1
+  canAttackJumpDown: 1
+  jumpDownSpeed: -300
+  isAttackingIdle: 0
+  isAttackingCrouch: 0
+  isAttackingJump: 0
+  isAttackingJumpDown: 0
+  attackIdleAnimation: Heroine - Attack
+  attackCrouchAnimation: Heroine - Crouch Attack
+  attackJumpAnimation: Heroine - Jump Attack
+  attackJumpDownAnimation: Heroine - Jump Down Attack
+  jumpAttackDirection: 2
+  jumpAttackMovement: 0
+  jumpDownAttackDirection: 2
+  jumpDownAttackMovement: 1
 --- !u!50 &1773618105
 Rigidbody2D:
   serializedVersion: 5

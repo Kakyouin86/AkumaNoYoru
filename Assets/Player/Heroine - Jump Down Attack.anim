@@ -6,7 +6,7 @@ AnimationClip:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Heroine - Jump Fall Attack
+  m_Name: Heroine - Jump Down Attack
   serializedVersion: 7
   m_Legacy: 0
   m_Compressed: 0
@@ -22,20 +22,20 @@ AnimationClip:
     curve:
     - time: 0
       value: {fileID: -7822128633873684004, guid: bd1106feaf249fb4ab4a17f6fbe48a79, type: 3}
-    - time: 0.05
+    - time: 0.0125
       value: {fileID: 5152968353105112703, guid: bd1106feaf249fb4ab4a17f6fbe48a79, type: 3}
-    - time: 0.1
+    - time: 0.025
       value: {fileID: 5039352237041146584, guid: bd1106feaf249fb4ab4a17f6fbe48a79, type: 3}
-    - time: 0.15
+    - time: 0.0375
       value: {fileID: -6777375898218139577, guid: bd1106feaf249fb4ab4a17f6fbe48a79, type: 3}
-    - time: 0.2
+    - time: 0.05
       value: {fileID: 6365300051905848461, guid: bd1106feaf249fb4ab4a17f6fbe48a79, type: 3}
     attribute: m_Sprite
     path: 
     classID: 212
     script: {fileID: 0}
     flags: 2
-  m_SampleRate: 20
+  m_SampleRate: 80
   m_WrapMode: 0
   m_Bounds:
     m_Center: {x: 0, y: 0, z: 0}
@@ -62,7 +62,7 @@ AnimationClip:
     m_AdditiveReferencePoseClip: {fileID: 0}
     m_AdditiveReferencePoseTime: 0
     m_StartTime: 0
-    m_StopTime: 0.25
+    m_StopTime: 0.0625
     m_OrientationOffsetY: 0
     m_Level: 0
     m_CycleOffset: 0
