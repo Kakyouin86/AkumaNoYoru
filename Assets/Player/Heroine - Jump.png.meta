@@ -196,6 +196,28 @@ TextureImporter:
       indices: 
       edges: []
       weights: []
+    - serializedVersion: 2
+      name: Heroine - Jump_4
+      rect:
+        serializedVersion: 2
+        x: 512
+        y: 0
+        width: 128
+        height: 64
+      alignment: 7
+      pivot: {x: 0.5, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 7b10edf367d877744a79a5d1509cdeec
+      internalID: 1963674396
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
     outline: []
     customData: 
     physicsShape: []
@@ -216,6 +238,7 @@ TextureImporter:
       Heroine - Jump_1: 1324157829288285750
       Heroine - Jump_2: 7276903474114874846
       Heroine - Jump_3: 8459766283230664014
+      Heroine - Jump_4: 1963674396
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
