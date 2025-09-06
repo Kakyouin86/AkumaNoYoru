@@ -40,7 +40,7 @@ public class PlayerController : MonoBehaviour
     public bool canJump = true;
     public float jumpForce = 200f;
     public int totalJumps = 2;
-    public int availableJumps;
+    [ReadOnly] public int availableJumps;
     [ReadOnly] public bool isJumping;
 
     [Header("Jump Feel")]
@@ -54,18 +54,12 @@ public class PlayerController : MonoBehaviour
     [Header("Attack Settings")]
     public bool canAttackIdle = true;
     public bool canAttackCrouch = true;
-    public bool canAttackJump = true;
-    [ReadOnly] public bool isAttackingIdle;
-    [ReadOnly] public bool isAttackingCrouch;
-    [ReadOnly] public bool isAttackingJump;
+    [ReadOnly] public bool isAttacking;
     public string attackIdleAnimation = "Heroine - Attack";
     public string attackCrouchAnimation = "Heroine - Crouch Attack";
-    public string attackJumpAnimation = "Heroine - Jump Attack";
-
 
     private Player player;
 
-    // -------------------- UNITY EVENTS --------------------
     void Awake()
     {
         theRB = GetComponent<Rigidbody2D>();
@@ -99,14 +93,11 @@ public class PlayerController : MonoBehaviour
     {
         float moveInput = player.GetAxis("Move Horizontal");
 
-        if (isAttackingIdle || isAttackingCrouch || !canMove)
-            moveInput = 0f;
-
-        if (isCrouching && !canCrawl)
+        // Bloquear movimiento si está atacando
+        if (isAttacking || (isCrouching && !canCrawl))
             moveInput = 0f;
 
         float speed = moveSpeed;
-
         if (isCrouching && canCrawl)
             speed = isCrawling ? crawlMoveSpeed : moveSpeed;
 
@@ -116,6 +107,10 @@ public class PlayerController : MonoBehaviour
     void Jump()
     {
         if (!canJump) return;
+
+        // Bloquear salto si está atacando
+        if (isAttacking)
+            return;
 
         if (player.GetButtonDown("Jump"))
         {
@@ -164,36 +159,34 @@ public class PlayerController : MonoBehaviour
     void HandleAttack()
     {
         // Ataque Idle
-        if (!isAttackingIdle && !isCrouching && isGrounded && canAttackIdle && player.GetButtonDown("Attack"))
-            StartAttack(ref isAttackingIdle, "IsAttackingIdle", attackIdleAnimation, true);
+        if (!isAttacking && !isCrouching && isGrounded && canAttackIdle && player.GetButtonDown("Attack"))
+            StartAttack(attackIdleAnimation, "IsAttackingIdle");
 
         // Ataque Crouch
-        if (!isAttackingCrouch && isCrouching && isGrounded && canAttackCrouch && player.GetButtonDown("Attack"))
-            StartAttack(ref isAttackingCrouch, "IsAttackingCrouch", attackCrouchAnimation, true);
+        if (!isAttacking && isCrouching && isGrounded && canAttackCrouch && player.GetButtonDown("Attack"))
+            StartAttack(attackCrouchAnimation, "IsAttackingCrouch");
 
-        // Check finish attacks
-        CheckAttackFinish(ref isAttackingIdle, attackIdleAnimation, "IsAttackingIdle");
-        CheckAttackFinish(ref isAttackingCrouch, attackCrouchAnimation, "IsAttackingCrouch");
+        // Revisar si termina la animación
+        if (isAttacking)
+        {
+            AnimatorStateInfo state = theAnim.GetCurrentAnimatorStateInfo(0);
+            if ((state.IsName(attackIdleAnimation) || state.IsName(attackCrouchAnimation)) && state.normalizedTime >= 1f)
+                FinishAttack();
+        }
     }
 
-    void StartAttack(ref bool attackState, string animBool, string animName, bool stopMovement)
+    void StartAttack(string animName, string animBool)
     {
-        attackState = true;
+        isAttacking = true;
         theAnim.SetBool(animBool, true);
-        if (stopMovement) theRB.linearVelocity = new Vector2(0f, theRB.linearVelocity.y);
+        theRB.linearVelocity = new Vector2(0f, theRB.linearVelocity.y); // detener movimiento
     }
 
-    void CheckAttackFinish(ref bool attackState, string animName, string animBool)
+    void FinishAttack()
     {
-        AnimatorStateInfo state = theAnim.GetCurrentAnimatorStateInfo(0);
-        if (state.IsName(animName) && state.normalizedTime >= 1f)
-            FinishAttack(ref attackState, animBool);
-    }
-
-    void FinishAttack(ref bool attackState, string animBool)
-    {
-        attackState = false;
-        theAnim.SetBool(animBool, false);
+        isAttacking = false;
+        theAnim.SetBool("IsAttackingIdle", false);
+        theAnim.SetBool("IsAttackingCrouch", false);
     }
 
     // -------------------- GROUND CHECK --------------------
@@ -243,8 +236,8 @@ public class PlayerController : MonoBehaviour
         theAnim.SetBool("IsCrouching", isCrouching);
         theAnim.SetBool("IsCrawling", isCrawling);
         theAnim.SetBool("IsJumping", isJumping);
-        theAnim.SetBool("IsAttackingIdle", isAttackingIdle);
-        theAnim.SetBool("IsAttackingCrouch", isAttackingCrouch);
+        theAnim.SetBool("IsAttackingIdle", theAnim.GetBool("IsAttackingIdle"));
+        theAnim.SetBool("IsAttackingCrouch", theAnim.GetBool("IsAttackingCrouch"));
     }
 
     void UpdateDebugVars()
@@ -258,27 +251,28 @@ public class PlayerController : MonoBehaviour
     // -------------------- COLLIDER MANAGEMENT --------------------
     void UpdateColliders()
     {
-        if (isAttackingIdle)
+        if (isAttacking)
         {
-            if (standCollider != null) standCollider.enabled = true;
-            if (crouchCollider != null) crouchCollider.enabled = false;
-            if (crawlCollider != null) crawlCollider.enabled = false;
-            return;
+            if (theAnim.GetBool("IsAttackingIdle"))
+            {
+                standCollider.enabled = true;
+                crouchCollider.enabled = false;
+                crawlCollider.enabled = false;
+                return;
+            }
+            if (theAnim.GetBool("IsAttackingCrouch"))
+            {
+                standCollider.enabled = false;
+                crouchCollider.enabled = true;
+                crawlCollider.enabled = false;
+                return;
+            }
         }
 
-        if (isAttackingCrouch)
-        {
-            if (standCollider != null) standCollider.enabled = false;
-            if (crouchCollider != null) crouchCollider.enabled = true;
-            if (crawlCollider != null) crawlCollider.enabled = false;
-            return;
-        }
-
-        if (standCollider != null) standCollider.enabled = !isCrouching && !isCrawling;
-        if (crouchCollider != null) crouchCollider.enabled = isCrouching && !isCrawling;
-        if (crawlCollider != null) crawlCollider.enabled = isCrawling;
+        standCollider.enabled = !isCrouching && !isCrawling;
+        crouchCollider.enabled = isCrouching && !isCrawling;
+        crawlCollider.enabled = isCrawling;
     }
-
 
     // -------------------- DEBUG --------------------
     void OnDrawGizmos()
