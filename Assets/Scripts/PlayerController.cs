@@ -22,6 +22,12 @@ public class PlayerController : MonoBehaviour
     public LayerMask groundLayer;
     [ReadOnly] public bool isGrounded;
 
+    [Header("Slope Settings")]
+    public LayerMask slopeLayer;
+    public float slopeRayLength = 10f;
+    [ReadOnly] public bool onSlope;
+    [ReadOnly] public float slopeAngle;
+
     [Header("Movement Settings")]
     public bool canMove = true;
     public float moveSpeed = 120f;
@@ -29,6 +35,12 @@ public class PlayerController : MonoBehaviour
     public bool facingRight = true;
     [ReadOnly] public float currentSpeed;
     [ReadOnly] public float verticalVelocity;
+
+    [Header("Head Check Settings")]
+    public Vector2 headCheckOffset = new Vector2(0f, 25f);
+    public float headCheckRadius = 10f;
+    public LayerMask ceilingLayer;
+    [ReadOnly] public bool hasCeiling;
 
     [Header("Crouch & Crawl Settings")]
     public bool canCrouch = true;
@@ -70,18 +82,31 @@ public class PlayerController : MonoBehaviour
     public string attackJumpAnimation = "Heroine - Jump Attack";
     //public string attackJumpDownAnimation = "Heroine - Jump Down Attack";
     public string attackUpAnimation = "Heroine - Attack Up";
-    
+
+    [Header("Dive Kick Settings")]
+    public bool canDiveKick = true;
+    public float diveKickAngle = 45f;
+    public float diveKickSpeed = 350f;
+    private float originalGravityScale = 50f;
+    private Vector2 diveDirection;
+    [ReadOnly] public bool isDiveKicking;
+
+
     public enum JumpAttackDirection { Up, Down, Both }
     public enum JumpDownAttackDirection { Up, Down, Both }
     public enum AirAttackMovement { Freeze, Free }
+    public enum DiveKickMode { AscendOnly, DescendOnly, Free }
 
-    [Header("Jump Attack Settings")]
+    [Header("Jump Attack Form")]
     public JumpAttackDirection jumpAttackDirection = JumpAttackDirection.Both;
     public AirAttackMovement jumpAttackMovement = AirAttackMovement.Freeze;
 
-    [Header("Jump Down Attack Settings")]
+    [Header("Jump Down Attack Form")]
     public JumpDownAttackDirection jumpDownAttackDirection = JumpDownAttackDirection.Both;
     public AirAttackMovement jumpDownAttackMovement = AirAttackMovement.Free;
+
+    [Header("Dive Kick Form")]
+    public DiveKickMode diveKickMode = DiveKickMode.Free;
 
     [Header("Slide Settings")]
     public bool canSlide = true;
@@ -103,16 +128,26 @@ public class PlayerController : MonoBehaviour
     {
         player = ReInput.players.GetPlayer(0);
         ResetJumps();
+        groundLayer = LayerMask.GetMask("Floor");
+        slopeLayer = LayerMask.GetMask("Slope");
+        ceilingLayer = LayerMask.GetMask("Floor");
+        originalGravityScale = GetComponent<Rigidbody2D>().gravityScale;
     }
 
     void Update()
     {
         if (!canMove) return;
+        if (isDiveKicking)
+        {
+            theRB.linearVelocity = diveDirection * diveKickSpeed;
+        }
 
         GroundCheck();
         HandleSlide();
+        HandleDiveKick();
         Jump();
         Walk();
+        HeadCheck();
         Crouch();
         HandleAttack();
         UpdateFacing();
@@ -121,10 +156,100 @@ public class PlayerController : MonoBehaviour
         UpdateColliders();
     }
 
+    // -------------------- SLIDE --------------------
+    public void HandleSlide()
+    {
+        if (!canSlide) return;
+        if (isAttackingIdle || isAttackingCrouch || isAttackingJump || isAttackingJumpDown || isAttackingUp) return;
+
+        if (isSliding && !isGrounded)
+        {
+            FinishSlide();
+            return;
+        }
+
+        if (!isSliding && isGrounded && player.GetButton("Crouch") && player.GetButtonDown("Jump"))
+        {
+            StartSlide();
+        }
+
+        if (isSliding)
+        {
+            slideTimer -= Time.deltaTime;
+
+            float direction = facingRight ? 1f : -1f;
+            theRB.linearVelocity = new Vector2(direction * slideForce, theRB.linearVelocity.y);
+
+            if (slideTimer <= 0f)
+            {
+                FinishSlide();
+            }
+        }
+    }
+
+    public void StartSlide()
+    {
+        isSliding = true;
+        slideTimer = slideDuration;
+
+        theAnim.SetBool("IsSliding", true);
+
+        float direction = facingRight ? 1f : -1f;
+        theRB.linearVelocity = new Vector2(direction * slideForce, theRB.linearVelocity.y);
+    }
+
+    public void FinishSlide()
+    {
+        isSliding = false;
+        theAnim.SetBool("IsSliding", false);
+        theRB.linearVelocity = new Vector2(0f, theRB.linearVelocity.y);
+    }
+
+    // -------------------- DIVE KICK --------------------
+    public void HandleDiveKick()
+    {
+        if (!canDiveKick || isDiveKicking) return;
+
+        bool downPressed = player.GetAxis("Move Vertical") < -0.5f;
+        bool jumpPressed = player.GetButtonDown("Jump");
+
+        if (!isGrounded && downPressed && jumpPressed)
+        {
+            bool canPerform = false;
+            switch (diveKickMode)
+            {
+                case DiveKickMode.AscendOnly: canPerform = verticalVelocity > 0f; break;
+                case DiveKickMode.DescendOnly: canPerform = verticalVelocity <= 0f; break;
+                case DiveKickMode.Free: canPerform = true; break;
+            }
+
+            if (canPerform)
+                StartDiveKick();
+        }
+    }
+    public void StartDiveKick()
+    {
+        isDiveKicking = true;
+        theAnim.SetBool("IsDiveKicking", true);
+        float radians = diveKickAngle * Mathf.Deg2Rad;
+        float horizontal = facingRight ? Mathf.Cos(radians) : -Mathf.Cos(radians);
+        float vertical = -Mathf.Sin(radians);
+        diveDirection = new Vector2(horizontal, vertical).normalized;
+        theRB.gravityScale = 0f;
+    }
+
+    public void FinishDiveKick()
+    {
+        isDiveKicking = false;
+        theAnim.SetBool("IsDiveKicking", false);
+        theRB.gravityScale = originalGravityScale;
+    }
+
+
     // -------------------- MOVEMENT --------------------
     public void Walk()
     {
-        if (isSliding) return;
+        if (isSliding || isDiveKicking) return;
 
         float moveInput = player.GetAxis("Move Horizontal");
 
@@ -142,9 +267,11 @@ public class PlayerController : MonoBehaviour
         theRB.linearVelocity = new Vector2(moveInput * speed, theRB.linearVelocity.y);
     }
 
+
+    // -------------------- JUMP --------------------
     public void Jump()
     {
-        if (isSliding) return;
+        if (isSliding || isDiveKicking) return;
         if (!canJump || isAttackingJumpDown) return;
         if (isSliding) return;
         if (isGrounded && player.GetButton("Crouch") && player.GetButtonDown("Jump") && canSlide)
@@ -167,6 +294,7 @@ public class PlayerController : MonoBehaviour
             else if (availableJumps > 0)
             {
                 theRB.linearVelocity = new Vector2(theRB.linearVelocity.x, jumpForce);
+                theAnim.SetTrigger("ExtraJump");
                 availableJumps--;
             }
         }
@@ -180,6 +308,17 @@ public class PlayerController : MonoBehaviour
             theRB.linearVelocity += Vector2.up * Physics2D.gravity.y * (lowJumpMultiplier - 1) * Time.deltaTime;
     }
 
+    // -------------------- HEAD CHECK --------------------
+    public void HeadCheck()
+    {
+        Vector2 headPos = (Vector2)transform.position + headCheckOffset;
+        RaycastHit2D hit = Physics2D.Raycast(headPos, Vector2.up, headCheckRadius, ceilingLayer);
+        Color rayColor = hit.collider != null ? Color.yellow : Color.cyan;
+        Debug.DrawRay(headPos, Vector2.up * headCheckRadius, rayColor);
+        hasCeiling = hit.collider != null;
+    }
+
+    // -------------------- CROUCH --------------------
     public void Crouch()
     {
         if (!canCrouch || isSliding)
@@ -192,7 +331,7 @@ public class PlayerController : MonoBehaviour
         bool downPressed = player.GetButton("Crouch");
         float horizontalInput = player.GetAxis("Move Horizontal");
 
-        if (downPressed && isGrounded)
+        if ((downPressed && isGrounded) || hasCeiling)
         {
             isCrouching = true;
             isCrawling = (canCrawl && Mathf.Abs(horizontalInput) > 0.01f);
@@ -226,8 +365,9 @@ public class PlayerController : MonoBehaviour
 
             if (canPerform)
             {
+                FinishDiveKick();
                 StartAttackJumpDown();
-                return; // Prioridad alta, no ejecutar otros ataques
+                return;
             }
         }
 
@@ -245,6 +385,7 @@ public class PlayerController : MonoBehaviour
 
             if (canPerform)
             {
+                FinishDiveKick();
                 StartAttackJump();
                 return;
             }
@@ -346,7 +487,7 @@ public class PlayerController : MonoBehaviour
     {
         isAttackingUp = true;
         theAnim.SetBool("IsAttackingUp", true);
-        theRB.linearVelocity = new Vector2(0f, theRB.linearVelocity.y); // detiene movimiento horizontal
+        theRB.linearVelocity = new Vector2(0f, theRB.linearVelocity.y);
     }
 
     public void FinishAttackUp()
@@ -363,12 +504,47 @@ public class PlayerController : MonoBehaviour
         Vector2 left = basePos + Vector2.left * groundCheckWidth;
         Vector2 right = basePos + Vector2.right * groundCheckWidth;
 
+        // -------------------- GROUND DETECTION --------------------
         bool centerHit = Physics2D.OverlapCircle(basePos, groundCheckRadius, groundLayer);
         bool leftHit = Physics2D.OverlapCircle(left, groundCheckRadius, groundLayer);
         bool rightHit = Physics2D.OverlapCircle(right, groundCheckRadius, groundLayer);
 
         isGrounded = centerHit || leftHit || rightHit;
 
+        // -------------------- SLOPE DETECTION --------------------
+        onSlope = false;
+        slopeAngle = 0f;
+
+        Vector2[] rayOrigins = new Vector2[] { left, basePos, right };
+        foreach (Vector2 origin in rayOrigins)
+        {
+            RaycastHit2D slopeHit = Physics2D.Raycast(origin, Vector2.down, slopeRayLength, slopeLayer);
+
+            Debug.DrawRay(origin, Vector2.down * slopeRayLength, slopeHit.collider != null ? Color.green : Color.red);
+
+            if (slopeHit)
+            {
+                slopeAngle = Vector2.Angle(slopeHit.normal, Vector2.up);
+                if (slopeAngle > 0.1f)
+                {
+                    onSlope = true;
+                    isGrounded = true;
+                    break;
+                }
+            }
+        }
+
+        // -------------------- CONSTRAINTS PARA SLOPE --------------------
+        if (onSlope && Mathf.Abs(theRB.linearVelocity.x) < 0.05f)
+        {
+            theRB.constraints = RigidbodyConstraints2D.FreezePositionX | RigidbodyConstraints2D.FreezePositionY | RigidbodyConstraints2D.FreezeRotation;
+        }
+        else
+        {
+            theRB.constraints = RigidbodyConstraints2D.FreezeRotation;
+        }
+
+        // -------------------- GROUND LOGIC --------------------
         if (isGrounded)
         {
             ResetJumps();
@@ -376,6 +552,7 @@ public class PlayerController : MonoBehaviour
 
             if (isAttackingJumpDown) FinishAttackJumpDown();
             if (isAttackingJump) FinishAttackJump();
+            if (isDiveKicking) FinishDiveKick();
         }
         else
         {
@@ -400,55 +577,7 @@ public class PlayerController : MonoBehaviour
         if (theSR != null)
             theSR.flipX = !facingRight;
     }
-
-    public void HandleSlide()
-    {
-        if (!canSlide) return;
-        if (isAttackingIdle || isAttackingCrouch || isAttackingJump || isAttackingJumpDown || isAttackingUp) return;
-
-        if (isSliding && !isGrounded)
-        {
-            FinishSlide();
-            return;
-        }
-
-        if (!isSliding && isGrounded && player.GetButton("Crouch") && player.GetButtonDown("Jump"))
-        {
-            StartSlide();
-        }
-
-        if (isSliding)
-        {
-            slideTimer -= Time.deltaTime;
-
-            float direction = facingRight ? 1f : -1f;
-            theRB.linearVelocity = new Vector2(direction * slideForce, theRB.linearVelocity.y);
-
-            if (slideTimer <= 0f)
-            {
-                FinishSlide();
-            }
-        }
-    }
-
-    public void StartSlide()
-    {
-        isSliding = true;
-        slideTimer = slideDuration;
-
-        theAnim.SetBool("IsSliding", true);
-
-        float direction = facingRight ? 1f : -1f;
-        theRB.linearVelocity = new Vector2(direction * slideForce, theRB.linearVelocity.y);
-    }
-
-    public void FinishSlide()
-    {
-        isSliding = false;
-        theAnim.SetBool("IsSliding", false);
-        theRB.linearVelocity = new Vector2(0f, theRB.linearVelocity.y);
-    }
-
+    
     // -------------------- ANIMATOR --------------------
     public void UpdateAnimator()
     {
@@ -486,13 +615,6 @@ public class PlayerController : MonoBehaviour
             return;
         }
 
-        if (isAttackingUp)
-        {
-            standCollider.enabled = true;
-            crouchCollider.enabled = false;
-            crawlCollider.enabled = false;
-            return;
-        }
 
         if (isAttackingCrouch)
         {
@@ -502,9 +624,26 @@ public class PlayerController : MonoBehaviour
             return;
         }
 
-        standCollider.enabled = !isCrouching && !isCrawling;
-        crouchCollider.enabled = isCrouching && !isCrawling;
-        crawlCollider.enabled = isCrawling;
+        if (isSliding)
+        {
+            standCollider.enabled = false;
+            crouchCollider.enabled = false;
+            crawlCollider.enabled = true;
+            return;
+        }
+
+        if (hasCeiling)
+        {
+            standCollider.enabled = false;
+            crouchCollider.enabled = !isCrawling;
+            crawlCollider.enabled = isCrawling;
+        }
+        else
+        {
+            standCollider.enabled = !isCrouching && !isCrawling;
+            crouchCollider.enabled = isCrouching && !isCrawling;
+            crawlCollider.enabled = isCrawling;
+        }
     }
 
     // -------------------- DEBUG --------------------
@@ -519,5 +658,9 @@ public class PlayerController : MonoBehaviour
         Gizmos.DrawWireSphere(basePos, groundCheckRadius);
         Gizmos.DrawWireSphere(left, groundCheckRadius);
         Gizmos.DrawWireSphere(right, groundCheckRadius);
+
+        Gizmos.color = hasCeiling ? Color.yellow : Color.cyan;
+        Vector2 headPos = (Vector2)transform.position + headCheckOffset;
+        Gizmos.DrawWireSphere(headPos, headCheckRadius);
     }
 }
