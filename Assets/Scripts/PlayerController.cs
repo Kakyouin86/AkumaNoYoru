@@ -1,5 +1,6 @@
 ﻿using UnityEngine;
 using Rewired;
+using Rewired.Glyphs;
 using Unity.Collections;
 
 [RequireComponent(typeof(Rigidbody2D))]
@@ -71,6 +72,8 @@ public class PlayerController : MonoBehaviour
     public bool canAttackUp = true;
 
     [ReadOnly] public bool isAttackingIdle;
+    [ReadOnly] public bool queuedSecondAttack;
+    [ReadOnly] public bool isSecondAttackingIdle;
     [ReadOnly] public bool isAttackingCrouch;
     [ReadOnly] public bool isAttackingJump;
     [ReadOnly] public bool isAttackingJumpDown;
@@ -78,6 +81,7 @@ public class PlayerController : MonoBehaviour
 
     public float jumpDownSpeed = -300f;
     public string attackIdleAnimation = "Heroine - Attack";
+    public string attackSecondAttackAnimation = "Heroine - Second Attack";
     public string attackCrouchAnimation = "Heroine - Crouch Attack";
     public string attackJumpAnimation = "Heroine - Jump Attack";
     //public string attackJumpDownAnimation = "Heroine - Jump Down Attack";
@@ -92,8 +96,8 @@ public class PlayerController : MonoBehaviour
     [ReadOnly] public bool isDiveKicking;
 
 
-    public enum JumpAttackDirection { Up, Down, Both }
-    public enum JumpDownAttackDirection { Up, Down, Both }
+    public enum JumpAttackDirection { AscendOnly, DescendOnly, Both }
+    public enum JumpDownAttackDirection { AscendOnly, DescendOnly, Both }
     public enum AirAttackMovement { Freeze, Free }
     public enum DiveKickMode { AscendOnly, DescendOnly, Free }
 
@@ -288,6 +292,7 @@ public class PlayerController : MonoBehaviour
                 coyoteTimeCounter = 0f;
 
                 if (isAttackingIdle) FinishAttackIdle();
+                if (isSecondAttackingIdle) FinishSecondAttackIdle();
                 if (isAttackingCrouch) FinishAttackCrouch();
                 if (isAttackingUp) FinishAttackUp();
             }
@@ -350,16 +355,16 @@ public class PlayerController : MonoBehaviour
         if (player.GetButtonDown("Jump"))
             return;
 
-        // -------------------- ATAQUES EN AIRE --------------------
-        // Ataque Jump Down (↓ + Attack) PRIORIDAD ALTA
+        // -------------------- AIR ATTACK --------------------
+        // Attack Jump Down (↓ + Attack)
         if (canAttackJumpDown && !isAttackingJumpDown && !isGrounded && player.GetButton("Crouch") && player.GetButtonDown("Attack"))
         {
             bool canPerform = false;
 
             switch (jumpDownAttackDirection)
             {
-                case JumpDownAttackDirection.Up: canPerform = theRB.linearVelocity.y > 0f; break;
-                case JumpDownAttackDirection.Down: canPerform = theRB.linearVelocity.y <= 0f; break;
+                case JumpDownAttackDirection.AscendOnly: canPerform = theRB.linearVelocity.y > 0f; break;
+                case JumpDownAttackDirection.DescendOnly: canPerform = theRB.linearVelocity.y <= 0f; break;
                 case JumpDownAttackDirection.Both: canPerform = true; break;
             }
 
@@ -371,15 +376,15 @@ public class PlayerController : MonoBehaviour
             }
         }
 
-        // Ataque Jump normal (aire)
+        // Attack Jump normal (air)
         if (canAttackJump && !isAttackingJump && !isAttackingJumpDown && !isGrounded && player.GetButtonDown("Attack"))
         {
             bool canPerform = false;
 
             switch (jumpAttackDirection)
             {
-                case JumpAttackDirection.Up: canPerform = theRB.linearVelocity.y > 0f; break;
-                case JumpAttackDirection.Down: canPerform = theRB.linearVelocity.y <= 0f; break;
+                case JumpAttackDirection.AscendOnly: canPerform = theRB.linearVelocity.y > 0f; break;
+                case JumpAttackDirection.DescendOnly: canPerform = theRB.linearVelocity.y <= 0f; break;
                 case JumpAttackDirection.Both: canPerform = true; break;
             }
 
@@ -391,30 +396,37 @@ public class PlayerController : MonoBehaviour
             }
         }
 
-        // -------------------- ATAQUES EN SUELO --------------------
-        // Ataque Crouch
+        // -------------------- GROUND ATTACK --------------------
+        // Attack Crouch
         if (canAttackCrouch && !isAttackingCrouch && isCrouching && isGrounded && player.GetButtonDown("Attack"))
         {
             StartAttackCrouch();
             return;
         }
 
-        // Ataque Up
+        // Attack Up
         if (canAttackUp && !isAttackingUp && isGrounded && player.GetButtonDown("Attack") && player.GetAxis("Move Vertical") > 0.5f)
         {
             StartAttackUp();
             return;
         }
 
-        // Ataque Idle
+        // Attack Idle
         if (canAttackIdle && !isAttackingIdle && !isCrouching && isGrounded && player.GetButtonDown("Attack"))
         {
             StartAttackIdle();
             return;
         }
 
-        // -------------------- REVISAR FIN DE ANIMACIONES --------------------
+        if (isAttackingIdle && player.GetButtonDown("Attack"))
+        {
+            queuedSecondAttack = true;
+            theAnim.SetTrigger("SecondAttack");
+        }
+
+        // -------------------- CHECK ANIMATIONS ENDINGS --------------------
         if (isAttackingIdle) CheckAttackEnd(attackIdleAnimation, FinishAttackIdle);
+        if (isSecondAttackingIdle) CheckAttackEnd(attackSecondAttackAnimation, FinishSecondAttackIdle);
         if (isAttackingCrouch) CheckAttackEnd(attackCrouchAnimation, FinishAttackCrouch);
         if (isAttackingJump) CheckAttackEnd(attackJumpAnimation, FinishAttackJump);
         //if (isAttackingJumpDown) CheckAttackEnd(attackJumpDownAnimation, FinishAttackJumpDown);
@@ -431,6 +443,7 @@ public class PlayerController : MonoBehaviour
     // -------------------- ATTACK METHODS --------------------
     public void StartAttackIdle()
     {
+        isSecondAttackingIdle = false;
         isAttackingIdle = true;
         theAnim.SetBool("IsAttackingIdle", true);
         theRB.linearVelocity = new Vector2(0f, theRB.linearVelocity.y);
@@ -438,8 +451,27 @@ public class PlayerController : MonoBehaviour
 
     public void FinishAttackIdle()
     {
+        if (queuedSecondAttack)
+        {
+            //theAnim.SetTrigger("SecondAttack");
+            isSecondAttackingIdle = true;
+        }
+
+        else
+        {
+            isAttackingIdle = false;
+            isSecondAttackingIdle = false;
+            theAnim.SetBool("IsAttackingIdle", false);
+        }
+    }
+
+    public void FinishSecondAttackIdle()
+    {
+        queuedSecondAttack = false;
         isAttackingIdle = false;
+        isSecondAttackingIdle = false;
         theAnim.SetBool("IsAttackingIdle", false);
+        theAnim.ResetTrigger("SecondAttack");
     }
 
     public void StartAttackCrouch()
@@ -534,7 +566,7 @@ public class PlayerController : MonoBehaviour
             }
         }
 
-        // -------------------- CONSTRAINTS PARA SLOPE --------------------
+        // -------------------- CONSTRAINTS FOR SLOPE --------------------
         if (onSlope && Mathf.Abs(theRB.linearVelocity.x) < 0.05f)
         {
             theRB.constraints = RigidbodyConstraints2D.FreezePositionX | RigidbodyConstraints2D.FreezePositionY | RigidbodyConstraints2D.FreezeRotation;
@@ -594,6 +626,7 @@ public class PlayerController : MonoBehaviour
         theAnim.SetBool("IsAttackingJumpDown", isAttackingJumpDown);
         theAnim.SetBool("IsAttackingUp", isAttackingUp);
         theAnim.SetBool("IsSliding", isSliding);
+        theAnim.SetBool("IsDiveKicking", isDiveKicking);
     }
 
     public void UpdateDebugVars()

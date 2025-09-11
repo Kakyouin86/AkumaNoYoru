@@ -171,6 +171,28 @@ TextureImporter:
       indices: 
       edges: []
       weights: []
+    - serializedVersion: 2
+      name: Heroine - Dive Kick_3
+      rect:
+        serializedVersion: 2
+        x: 384
+        y: 0
+        width: 128
+        height: 64
+      alignment: 7
+      pivot: {x: 0.5, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: dd4d5c7d9e6e6cf428977445e1e1a882
+      internalID: -958545548
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
     outline: []
     customData: 
     physicsShape: []
@@ -190,6 +212,7 @@ TextureImporter:
       Heroine - Dive Kick_0: 1812526223014341743
       Heroine - Dive Kick_1: 5455239412913665434
       Heroine - Dive Kick_2: 2284628985653867489
+      Heroine - Dive Kick_3: -958545548
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

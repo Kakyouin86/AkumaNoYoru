@@ -58,11 +58,17 @@ public class AnimationEventBridge : MonoBehaviour
 
     public void FinishAllIdleAttacks()
     {
-        if (playerController != null)
+        if (playerController != null && !playerController.queuedSecondAttack)
         {
             playerController.FinishAttackIdle();
             playerController.FinishAttackCrouch();
             playerController.FinishAttackUp();
         }
+    }
+
+    public void FinishSecondAttack()
+    {
+        playerController.FinishSecondAttackIdle();
+        FinishAllIdleAttacks();
     }
 }
