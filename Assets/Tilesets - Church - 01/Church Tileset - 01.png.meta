@@ -66021,6 +66021,28 @@ TextureImporter:
       indices: 
       edges: []
       weights: []
+    - serializedVersion: 2
+      name: Church Tileset - 01_2994
+      rect:
+        serializedVersion: 2
+        x: 816
+        y: 32
+        width: 120
+        height: 128
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: f522b26f30ab0e44ea94f5c927a314cc
+      internalID: 645768916
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
     outline: []
     customData: 
     physicsShape: []
@@ -68254,6 +68276,7 @@ TextureImporter:
       Church Tileset - 01_2991: -1245706877
       Church Tileset - 01_2992: 63473170
       Church Tileset - 01_2993: -1953607293
+      Church Tileset - 01_2994: 645768916
       Church Tileset - 01_3: 125682267
       Church Tileset - 01_30: -825215745
       Church Tileset - 01_300: 706048480
